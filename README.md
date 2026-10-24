@@ -4,7 +4,7 @@ An all-black, AI-assisted notebook. Your notes are plain Markdown files in a fol
 summarize, rewrite, fix and compare them. Windows desktop app first, an Android app and Wi-Fi sync later.
 [Türkçe README](README.tr.md)
 
-> **Status: early development.** The notebook itself works; the AI features are being built.
+> **Status: early development.** The notebook and the AI features work; there is no release yet and the Android app is still planned.
 
 ## Features
 
@@ -16,9 +16,17 @@ summarize, rewrite, fix and compare them. Windows desktop app first, an Android 
 - **Edits outside Pyramid are picked up** automatically.
 - **Turkish / English**, pure black theme.
 
-Planned: AI on your notes (summarize, rewrite, fix, compare several notes) with local Ollama first and then Claude,
-OpenAI and Gemini with your own API keys; an Android app that pairs with the desktop app over the same Wi-Fi.
-See [docs/PLAN.md](docs/PLAN.md).
+- **AI on your notes:** summarize, fix spelling, rewrite (clearer, shorter, formal, casual) and compare several notes.
+  It works on the whole note or just the passage you select, and always answers in the language of the note. Results
+  are never applied on their own: you choose Apply, Copy or Discard.
+- **Your choice of model:** local Ollama (default `gemma3:12b`) or Claude, OpenAI and Gemini with your own API key.
+  Keys are encrypted with Windows (DPAPI) and never shown to the interface. The panel always shows whether the text
+  stays local or goes to a cloud provider.
+
+Planned: an Android app that pairs with the desktop app over the same Wi-Fi. See [docs/PLAN.md](docs/PLAN.md).
+
+> Local models need a capable GPU to feel fast: on 8 GB of video memory a 12B model takes about a minute for a long
+> note. Cloud providers are much faster.
 
 ## Repository layout
 

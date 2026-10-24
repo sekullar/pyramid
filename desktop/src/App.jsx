@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { STRINGS } from './i18n.js';
+import { AiPanel, AiSettings, ComparePanel, useAi, useAiStatus } from './Ai.jsx';
 
 const SAVE_DELAY = 700;
 
@@ -65,15 +66,64 @@ function Sidebar({ notes, selected, query, setQuery, onOpen, onCreate, onSetting
   );
 }
 
-function Editor({ path, body, setBody, status, onRemove, t }) {
+function Editor({ path, title, body, setBody, status, onRemove, ai, aiStatus, onAiSettings, t }) {
   const [mode, setMode] = useState('split');
   const [armed, setArmed] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
+  const [sel, setSel] = useState({ start: 0, end: 0 });
+  const [bar, setBar] = useState(null);
+  const area = useRef(null);
+  const panes = useRef(null);
+  const runScope = useRef(null);
   useEffect(() => setArmed(false), [path]);
   useEffect(() => {
     if (!armed) return undefined;
     const timer = setTimeout(() => setArmed(false), 3000);
     return () => clearTimeout(timer);
   }, [armed]);
+
+  const scope = sel.end > sel.start
+    ? { text: body.slice(sel.start, sel.end), start: sel.start, end: sel.end, whole: false }
+    : { text: body, start: 0, end: body.length, whole: true };
+
+  const run = (action, input) => {
+    runScope.current = scope;
+    return ai.run(action, input);
+  };
+
+  const fromBar = (action) => {
+    setBar(null);
+    setAiOpen(true);
+    run(action, { text: scope.text, title, tone: 'clearer', length: 'medium' });
+  };
+
+  const apply = (action, text) => {
+    const s = runScope.current;
+    if (!s) return;
+    const quoted = text.split('\n').map((l) => `> ${l}`).join('\n');
+    const next = action === 'summarize'
+      ? `${body.slice(0, s.end)}\n\n${quoted}\n${body.slice(s.end)}`
+      : body.slice(0, s.start) + text + body.slice(s.end);
+    setBody(next);
+    setSel({ start: 0, end: 0 });
+    setBar(null);
+    ai.clear();
+  };
+
+  const trackSelection = (e) => {
+    const { selectionStart: start, selectionEnd: end } = e.target;
+    setSel({ start, end });
+    if (end <= start) setBar(null);
+  };
+
+  const showBar = (e) => {
+    const { selectionStart: start, selectionEnd: end } = e.target;
+    if (end <= start || !panes.current) return setBar(null);
+    const box = panes.current.getBoundingClientRect();
+    setBar({ x: Math.min(Math.max(e.clientX - box.left, 8), box.width - 250), y: Math.max(e.clientY - box.top - 44, 4) });
+  };
+
+  const aiForPanel = { ...ai, run };
 
   return (
     <div className="editor">
@@ -84,27 +134,53 @@ function Editor({ path, body, setBody, status, onRemove, t }) {
           ))}
         </div>
         <span className="status">{status === 'saving' ? t.saving : t.saved}</span>
+        <button className={aiOpen ? 'on-ai' : ''} onClick={() => setAiOpen(!aiOpen)}>{t.ai}</button>
         <button className={`danger${armed ? ' armed' : ''}`} onClick={() => (armed ? onRemove() : setArmed(true))}>
           {armed ? t.confirmDelete : t.delete}
         </button>
       </div>
-      <div className={`panes ${mode}`}>
-        {mode !== 'preview' && (
-          <textarea
-            autoFocus
-            spellCheck={false}
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder="# ..."
+      <div className="work">
+        <div className={`panes ${mode}`} ref={panes}>
+          {mode !== 'preview' && (
+            <textarea
+              ref={area}
+              autoFocus
+              spellCheck={false}
+              value={body}
+              onChange={(e) => { setBody(e.target.value); setBar(null); }}
+              onSelect={trackSelection}
+              onMouseUp={showBar}
+              onScroll={() => setBar(null)}
+              placeholder="# ..."
+            />
+          )}
+          {mode !== 'edit' && <div className="pane-preview"><Preview body={body} /></div>}
+          {bar && (
+            <div className="sel-bar" style={{ left: bar.x, top: bar.y }} onMouseDown={(e) => e.preventDefault()}>
+              <button onClick={() => fromBar('summarize')}>{t.aiSummarize}</button>
+              <button onClick={() => fromBar('rewrite')}>{t.aiRewrite}</button>
+              <button onClick={() => fromBar('fix')}>{t.aiFix}</button>
+            </div>
+          )}
+        </div>
+        {aiOpen && (
+          <AiPanel
+            ai={aiForPanel}
+            status={aiStatus}
+            scope={scope}
+            title={title}
+            onApply={apply}
+            onSettings={onAiSettings}
+            onClose={() => setAiOpen(false)}
+            t={t}
           />
         )}
-        {mode !== 'edit' && <div className="pane-preview"><Preview body={body} /></div>}
       </div>
     </div>
   );
 }
 
-function Home({ notes, onOpen, onCreate, t }) {
+function Home({ notes, onOpen, onCreate, ai, aiStatus, onSaveResult, onAiSettings, t }) {
   return (
     <div className="home">
       <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -114,6 +190,9 @@ function Home({ notes, onOpen, onCreate, t }) {
       <h1>{t.welcomeTitle}</h1>
       <p>{t.welcomeText}</p>
       <button className="new wide" onClick={() => onCreate('')}>+ {t.newNote}</button>
+      {notes.length > 1 && (
+        <ComparePanel ai={ai} notes={notes} status={aiStatus} onSaveResult={onSaveResult} onSettings={onAiSettings} t={t} />
+      )}
       {notes.length > 0 && (
         <div className="recent">
           <h4>{t.recent}</h4>
@@ -124,7 +203,7 @@ function Home({ notes, onOpen, onCreate, t }) {
   );
 }
 
-function SettingsModal({ settings, onChange, onClose, t }) {
+function SettingsModal({ settings, onChange, aiStatus, setAiStatus, onClose, t }) {
   const pick = async () => {
     const res = await window.pyramid.pickFolder();
     if (res.ok && res.value) onChange({ notesDir: res.value });
@@ -148,6 +227,7 @@ function SettingsModal({ settings, onChange, onClose, t }) {
             <button onClick={pick}>{t.choose}</button>
           </div>
         </div>
+        {aiStatus && <AiSettings status={aiStatus} setStatus={setAiStatus} t={t} />}
         <div className="modal-foot"><button className="new" onClick={onClose}>{t.close}</button></div>
       </div>
     </div>
@@ -165,6 +245,8 @@ export default function App() {
   const loaded = useRef({ path: null, body: '' });
   const pending = useRef(null);
   const t = STRINGS[settings?.lang || 'en'];
+  const ai = useAi(t);
+  const [aiStatus, setAiStatus, reloadAiStatus] = useAiStatus();
 
   const refresh = useCallback(async () => {
     const res = await window.pyramid.listNotes();
@@ -183,6 +265,7 @@ export default function App() {
 
   const open = useCallback(async (rel) => {
     await flush();
+    ai.clear();
     const res = await window.pyramid.readNote(rel);
     if (!res.ok) return;
     loaded.current = { path: rel, body: res.value.body };
@@ -218,6 +301,17 @@ export default function App() {
       setBody('');
       refresh();
     }
+  };
+
+  const saveResult = async (text) => {
+    await flush();
+    const res = await window.pyramid.createNote('');
+    if (!res.ok) return;
+    await window.pyramid.saveNote(res.value, `# ${t.aiCompareTitle}
+
+${text}`);
+    await refresh();
+    await open(res.value);
   };
 
   const changeSettings = async (patch) => {
@@ -270,11 +364,38 @@ export default function App() {
       />
       <main key={selected || 'home'}>
         {selected
-          ? <Editor path={selected} body={body} setBody={edit} status={status} onRemove={remove} t={t} />
-          : <Home notes={notes} onOpen={open} onCreate={create} t={t} />}
+          ? <Editor
+              path={selected}
+              title={notes.find((n) => n.path === selected)?.title || ''}
+              body={body}
+              setBody={edit}
+              status={status}
+              onRemove={remove}
+              ai={ai}
+              aiStatus={aiStatus}
+              onAiSettings={() => setShowSettings(true)}
+              t={t}
+            />
+          : <Home
+              notes={notes}
+              onOpen={open}
+              onCreate={create}
+              ai={ai}
+              aiStatus={aiStatus}
+              onSaveResult={saveResult}
+              onAiSettings={() => setShowSettings(true)}
+              t={t}
+            />}
       </main>
       {showSettings && (
-        <SettingsModal settings={settings} onChange={changeSettings} onClose={() => setShowSettings(false)} t={t} />
+        <SettingsModal
+          settings={settings}
+          onChange={changeSettings}
+          aiStatus={aiStatus}
+          setAiStatus={setAiStatus}
+          onClose={() => { setShowSettings(false); reloadAiStatus(); }}
+          t={t}
+        />
       )}
     </div>
   );

@@ -1,7 +1,8 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, safeStorage } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { Notes } = require('./notes');
+const { Ai } = require('./ai');
 
 const settingsFile = () => path.join(app.getPath('userData'), 'settings.json');
 
@@ -84,6 +85,22 @@ app.whenReady().then(() => {
     const res = await dialog.showOpenDialog(win, { properties: ['openDirectory', 'createDirectory'] });
     return res.canceled ? null : res.filePaths[0];
   }));
+
+  const ai = new Ai({
+    dir: app.getPath('userData'),
+    safeStorage,
+    readNote: (rel) => notes.read(rel),
+    getConfig: () => readSettings().ai,
+    setConfig: (cfg) => writeSettings({ ai: cfg }),
+  });
+  const send = (channel, payload) => { if (!win.isDestroyed()) win.webContents.send(channel, payload); };
+
+  ipcMain.handle('ai:status', reply(() => ai.status()));
+  ipcMain.handle('ai:configure', reply((patch) => ai.setConfigPatch(patch)));
+  ipcMain.handle('ai:setKey', reply((provider, key) => { ai.setKey(provider, String(key || '')); return ai.status(); }));
+  ipcMain.handle('ai:models', reply((provider) => ai.models(provider)));
+  ipcMain.handle('ai:run', reply((id, req) => ai.run(String(id), req, send)));
+  ipcMain.handle('ai:stop', reply((id) => ai.stop(String(id))));
 
   ipcMain.handle('notes:list', reply(() => notes.list()));
   ipcMain.handle('notes:read', reply((rel) => notes.read(rel)));

@@ -4,7 +4,7 @@ Tamamen siyah, yapay zeka destekli bir not defteri. Notların, seçtiğin bir kl
 onları özetlemene, yeniden yazmana, düzeltmene ve karşılaştırmana yardım eder. Önce Windows masaüstü uygulaması,
 sonra Android uygulaması ve Wi-Fi eşitleme gelecek. [English README](README.md)
 
-> **Durum: erken geliştirme.** Not defteri çalışıyor; yapay zeka özellikleri yapım aşamasında.
+> **Durum: erken geliştirme.** Not defteri ve yapay zeka özellikleri çalışıyor; henüz release yok, Android uygulaması planlanıyor.
 
 ## Özellikler
 
@@ -16,9 +16,17 @@ sonra Android uygulaması ve Wi-Fi eşitleme gelecek. [English README](README.md
 - Pyramid dışında yapılan düzenlemeler **otomatik algılanır**.
 - **Türkçe / English**, saf siyah tema.
 
-Planlananlar: notlar üzerinde yapay zeka (özetle, yeniden yaz, düzelt, birden çok notu karşılaştır). Önce yerel Ollama,
-sonra kendi API anahtarınla Claude, OpenAI ve Gemini. Ayrıca aynı Wi-Fi'de masaüstü ile eşleşen bir Android uygulaması.
-Ayrıntı: [docs/PLAN.md](docs/PLAN.md).
+- **Notlarda yapay zeka:** özetle, yazım düzelt, yeniden yaz (daha açık, kısa, resmi, samimi) ve birden çok notu
+  karşılaştır. Tüm notta ya da yalnızca seçtiğin bölümde çalışır, cevabı her zaman notun diliyle verir. Sonuçlar
+  kendiliğinden uygulanmaz: Uygula, Kopyala ya da Vazgeç'i sen seçersin.
+- **Model seçimi senin:** yerel Ollama (varsayılan `gemma3:12b`) ya da kendi API anahtarınla Claude, OpenAI ve Gemini.
+  Anahtarlar Windows (DPAPI) ile şifrelenir, arayüze hiç gösterilmez. Panel, metnin yerelde mi kaldığını yoksa bulut
+  sağlayıcıya mı gittiğini her zaman gösterir.
+
+Planlananlar: aynı Wi-Fi'de masaüstü ile eşleşen bir Android uygulaması. Ayrıntı: [docs/PLAN.md](docs/PLAN.md).
+
+> Yerel modellerin hızlı hissettirmesi için güçlü bir ekran kartı gerekir: 8 GB video belleğinde 12B model uzun bir
+> not için yaklaşık bir dakika sürer. Bulut sağlayıcılar çok daha hızlıdır.
 
 ## Repo yapısı
 

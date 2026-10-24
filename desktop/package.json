@@ -1,0 +1,45 @@
+{
+  "name": "pyramid",
+  "version": "0.1.0",
+  "description": "AI-assisted, all-black Markdown notebook",
+  "main": "electron/main.js",
+  "license": "MIT",
+  "author": "Ahmet Efe Korkmaz",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sekullar/pyramid.git"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "start": "vite build && electron .",
+    "dist": "vite build && electron-builder --win nsis --publish never"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "dompurify": "^3.2.4",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0",
+    "marked": "^15.0.7",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "vite": "^5.4.0"
+  },
+  "build": {
+    "appId": "com.sekullar.pyramid",
+    "productName": "Pyramid",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**/*",
+      "dist/**/*",
+      "build/icon.png",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico"
+    }
+  }
+}

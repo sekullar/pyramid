@@ -9,6 +9,25 @@ contextBridge.exposeInMainWorld('pyramid', {
   saveNote: (rel, body) => ipcRenderer.invoke('notes:save', rel, body),
   createNote: (notebook) => ipcRenderer.invoke('notes:create', notebook),
   removeNote: (rel) => ipcRenderer.invoke('notes:remove', rel),
+  syncStatus: () => ipcRenderer.invoke('sync:status'),
+  syncSetEnabled: (on) => ipcRenderer.invoke('sync:setEnabled', on),
+  syncStartPairing: () => ipcRenderer.invoke('sync:startPairing'),
+  syncPairViaPhoneix: () => ipcRenderer.invoke('sync:pairViaPhoneix'),
+  syncCancelPairing: () => ipcRenderer.invoke('sync:cancelPairing'),
+  syncRemoveDevice: (id) => ipcRenderer.invoke('sync:removeDevice', id),
+  syncResolve: (copyId, choice) => ipcRenderer.invoke('sync:resolve', copyId, choice),
+  liveCall: (req) => ipcRenderer.invoke('live:call', req),
+  liveFlush: (id) => ipcRenderer.invoke('live:flush', id),
+  onLiveChanged: (cb) => {
+    const handler = (_e, payload) => cb(payload);
+    ipcRenderer.on('live:changed', handler);
+    return () => ipcRenderer.removeListener('live:changed', handler);
+  },
+  onSyncChanged: (cb) => {
+    const handler = (_e, payload) => cb(payload);
+    ipcRenderer.on('sync:changed', handler);
+    return () => ipcRenderer.removeListener('sync:changed', handler);
+  },
   aiStatus: () => ipcRenderer.invoke('ai:status'),
   aiConfigure: (patch) => ipcRenderer.invoke('ai:configure', patch),
   aiSetKey: (provider, key) => ipcRenderer.invoke('ai:setKey', provider, key),

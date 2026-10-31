@@ -74,6 +74,7 @@ class Notes {
             const rel = path.relative(root, full).split(path.sep).join('/');
             out.push({
               path: rel,
+              id: meta.id || null,
               notebook: path.dirname(rel) === '.' ? '' : path.dirname(rel),
               title: titleOf(body, entry.name),
               preview: body.replace(/^#.*$/m, '').replace(/\s+/g, ' ').trim().slice(0, 140),

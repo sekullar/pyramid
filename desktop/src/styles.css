@@ -165,3 +165,54 @@ button:disabled { opacity: .4; cursor: default; }
 .modal { max-height: calc(100vh - 40px); overflow-y: auto; }
 .seg.wrap { flex-wrap: wrap; }
 .row .hint, .ai-panel .hint { text-align: left; margin: 0; }
+
+/* ---------- phone sync ---------- */
+.row-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.row.col h4 { margin: 0 0 6px; font-size: 11px; font-weight: 600; letter-spacing: .8px; text-transform: uppercase; color: var(--faint); }
+.addr { padding: 3px 8px; border-radius: 7px; background: var(--raise); color: var(--text); font-size: 12px; user-select: all; }
+.faint { color: var(--faint); }
+
+.devices { display: flex; flex-direction: column; gap: 6px; }
+.device { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: 10px; background: var(--raise); border: 1px solid var(--line); }
+.device > div { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.device strong { font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.device span { font-size: 12px; color: var(--muted); }
+.device .danger { flex: none; font-size: 12.5px; }
+
+button.ghost { border: 1px solid var(--line2); border-radius: 9px; padding: 7px 14px; background: transparent; color: var(--muted); transition: color .2s, background .2s; }
+button.ghost:hover { color: var(--text); background: var(--raise); }
+
+.pair { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 18px 16px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line2); text-align: center; animation: pop .25s cubic-bezier(.2,.9,.3,1.2) both; }
+.pair h4 { margin: 0; align-self: flex-start; }
+.pair .hint { max-width: 340px; }
+.qr { padding: 10px; border-radius: 14px; background: #fff; line-height: 0; }
+.qr img { display: block; border-radius: 6px; image-rendering: pixelated; }
+.pair-done { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 18px 0 8px; }
+.pair-done p { margin: 0; color: var(--text); }
+.check { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 50%; background: #fff; color: #000; font-size: 24px; font-weight: 700; animation: pop .3s cubic-bezier(.2,.9,.3,1.4) both; }
+
+/* sidebar status line */
+.sync-badge { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 8px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font-size: 12px; text-align: left; transition: background .15s, color .15s; }
+.sync-badge:hover { background: var(--raise); color: var(--text); }
+.sync-badge span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: #3a3a3a; }
+.dot.on { background: #7ee2a0; box-shadow: 0 0 8px #7ee2a066; }
+.dot.wait { background: #8c8c8c; animation: blink 1.6s infinite ease-in-out; }
+.dot.warn { background: #ffd37a; box-shadow: 0 0 8px #ffd37a55; }
+
+/* conflict flag on a note row */
+.note-row { position: relative; }
+.flag { position: absolute; right: 9px; top: 9px; width: 16px; height: 16px; display: grid; place-items: center; border-radius: 50%; background: #ffd37a; color: #000; font-size: 11px; font-style: normal; font-weight: 700; }
+
+/* notice bars above the editor (conflict, changed elsewhere) */
+.bar { display: flex; align-items: center; justify-content: space-between; gap: 14px 20px; flex-wrap: wrap; padding: 11px 20px; background: #0d0b05; border-bottom: 1px solid #3a2f12; animation: fade .25s ease both; }
+.bar:not(.conflict) { background: var(--panel); border-bottom-color: var(--line2); }
+.bar-text { flex: 1 1 320px; min-width: 0; display: flex; align-items: flex-start; gap: 10px; }
+.bar-text p { margin: 0; font-size: 13px; line-height: 1.55; color: #e6e6e6; }
+.bar-text .pill { flex: none; margin-top: 1px; }
+.bar-text .faint { color: var(--muted); }
+.note-row.flagged strong { padding-right: 24px; }
+.bar-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.bar-actions button { border: 1px solid var(--line2); border-radius: 9px; padding: 6px 12px; background: transparent; color: var(--text); font-size: 12.5px; transition: background .15s; }
+.bar-actions button:hover:not(:disabled) { background: #1a1a1a; }
+.bar .err { flex-basis: 100%; }

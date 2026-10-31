@@ -25,12 +25,22 @@ jobs:
 
       - run: npm ci
 
+      # The sync engine decides which note wins, so a release must not go out with a failing test.
+      - run: npm test
+
       - run: npx vite build
 
       - run: npx electron-builder --win nsis --publish never
+
+      # The phone app is built on the maintainer's machine and committed under releases/ (like Phoneix).
+      # Sentinel Hub's "Download the phone app" button points at releases/latest/download/Pyramid.apk.
+      - name: Attach the Android APK
+        shell: bash
+        run: cp "$(ls ../releases/Pyramid-*.apk | sort -V | tail -1)" release/Pyramid.apk
 
       - uses: softprops/action-gh-release@v2
         with:
           files: |
             desktop/release/*.exe
             desktop/release/latest.yml
+            desktop/release/Pyramid.apk

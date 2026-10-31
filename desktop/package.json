@@ -12,7 +12,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "test": "node --test electron/sync/sync.test.js electron/sync/server.test.js electron/sync/manager.test.js electron/sync/ot.test.js electron/sync/live.test.js electron/phoneix.test.js",
     "start": "vite build && electron .",
+    "dist:local": "node scripts/build-local.js",
     "dist": "vite build && electron-builder --win nsis --publish never"
   },
   "devDependencies": {
@@ -33,13 +35,28 @@
     },
     "files": [
       "electron/**/*",
+      "!electron/**/*.test.js",
       "dist/**/*",
       "build/icon.png",
       "package.json"
     ],
     "win": {
-      "target": "nsis",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
     }
+  },
+  "dependencies": {
+    "qrcode": "^1.5.4"
   }
 }

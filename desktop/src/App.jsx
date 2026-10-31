@@ -1,8 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { mapCursor } from './textmap.js';
+import { useLive } from './useLive.js';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { STRINGS } from './i18n.js';
 import { AiPanel, AiSettings, ComparePanel, useAi, useAiStatus } from './Ai.jsx';
+import { ConflictBar, ExternalBar, SyncBadge, SyncSettings, useSync } from './Sync.jsx';
 
 const SAVE_DELAY = 700;
 
@@ -15,16 +18,17 @@ function Preview({ body }) {
   return <div className="md" dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
-function NoteRow({ note, active, onOpen, t }) {
+function NoteRow({ note, active, flag, onOpen, t }) {
   return (
-    <button className={`note-row${active ? ' on' : ''}`} onClick={() => onOpen(note.path)}>
+    <button className={`note-row${active ? ' on' : ''}${flag ? ' flagged' : ''}`} onClick={() => onOpen(note.path)}>
       <strong>{note.title || t.untitled}</strong>
       <span>{note.preview}</span>
+      {flag && <i className="flag" title={t.conflictMark}>!</i>}
     </button>
   );
 }
 
-function Sidebar({ notes, selected, query, setQuery, onOpen, onCreate, onSettings, t }) {
+function Sidebar({ notes, selected, query, setQuery, onOpen, onCreate, onSettings, sync, flagged, lang, t }) {
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase();
     const shown = q
@@ -54,10 +58,11 @@ function Sidebar({ notes, selected, query, setQuery, onOpen, onCreate, onSetting
         {groups.entries.map(([notebook, items]) => (
           <section key={notebook}>
             {notebook && <h4>{notebook}</h4>}
-            {items.map((n) => <NoteRow key={n.path} note={n} active={n.path === selected} onOpen={onOpen} t={t} />)}
+            {items.map((n) => <NoteRow key={n.path} note={n} active={n.path === selected} flag={flagged.has(n.id)} onOpen={onOpen} t={t} />)}
           </section>
         ))}
       </div>
+      <SyncBadge sync={sync} lang={lang} onClick={onSettings} t={t} />
       <div className="foot">
         <span>{notes.length} {t.notes}</span>
         <button onClick={onSettings}>{t.settings}</button>
@@ -66,7 +71,7 @@ function Sidebar({ notes, selected, query, setQuery, onOpen, onCreate, onSetting
   );
 }
 
-function Editor({ path, title, body, setBody, status, onRemove, ai, aiStatus, onAiSettings, t }) {
+function Editor({ path, title, body, setBody, status, onRemove, ai, aiStatus, onAiSettings, bars, t }) {
   const [mode, setMode] = useState('split');
   const [armed, setArmed] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
@@ -76,6 +81,21 @@ function Editor({ path, title, body, setBody, status, onRemove, ai, aiStatus, on
   const panes = useRef(null);
   const runScope = useRef(null);
   useEffect(() => setArmed(false), [path]);
+
+  // Text that arrives from another device (live sync) must not throw the cursor to the end of the box.
+  const typed = useRef(body);
+  const shown = useRef(body);
+  // The selection as it is on screen right now, read while rendering, i.e. before React replaces the text.
+  const before = useRef({ start: 0, end: 0 });
+  if (area.current) before.current = { start: area.current.selectionStart, end: area.current.selectionEnd };
+  useLayoutEffect(() => {
+    const el = area.current;
+    const prev = shown.current;
+    if (el && body !== prev && body !== typed.current) {
+      el.setSelectionRange(mapCursor(prev, body, before.current.start), mapCursor(prev, body, before.current.end));
+    }
+    shown.current = body;
+  }, [body]);
   useEffect(() => {
     if (!armed) return undefined;
     const timer = setTimeout(() => setArmed(false), 3000);
@@ -139,6 +159,7 @@ function Editor({ path, title, body, setBody, status, onRemove, ai, aiStatus, on
           {armed ? t.confirmDelete : t.delete}
         </button>
       </div>
+      {bars}
       <div className="work">
         <div className={`panes ${mode}`} ref={panes}>
           {mode !== 'preview' && (
@@ -147,7 +168,7 @@ function Editor({ path, title, body, setBody, status, onRemove, ai, aiStatus, on
               autoFocus
               spellCheck={false}
               value={body}
-              onChange={(e) => { setBody(e.target.value); setBar(null); }}
+              onChange={(e) => { typed.current = e.target.value; setBody(e.target.value); setBar(null); }}
               onSelect={trackSelection}
               onMouseUp={showBar}
               onScroll={() => setBar(null)}
@@ -203,7 +224,7 @@ function Home({ notes, onOpen, onCreate, ai, aiStatus, onSaveResult, onAiSetting
   );
 }
 
-function SettingsModal({ settings, onChange, aiStatus, setAiStatus, onClose, t }) {
+function SettingsModal({ settings, onChange, aiStatus, setAiStatus, sync, reloadSync, onClose, t }) {
   const pick = async () => {
     const res = await window.pyramid.pickFolder();
     if (res.ok && res.value) onChange({ notesDir: res.value });
@@ -227,6 +248,16 @@ function SettingsModal({ settings, onChange, aiStatus, setAiStatus, onClose, t }
             <button onClick={pick}>{t.choose}</button>
           </div>
         </div>
+        <SyncSettings sync={sync} reload={reloadSync} lang={settings.lang} t={t} />
+        <div className="row col">
+          <div className="row-head">
+            <div><h3>{t.liveTitle}</h3><p>{t.liveHint}</p></div>
+            <div className="seg">
+              <button className={!settings.liveTyping ? 'on' : ''} onClick={() => onChange({ liveTyping: false })}>{t.syncOff}</button>
+              <button className={settings.liveTyping ? 'on' : ''} onClick={() => onChange({ liveTyping: true })}>{t.syncOn}</button>
+            </div>
+          </div>
+        </div>
         {aiStatus && <AiSettings status={aiStatus} setStatus={setAiStatus} t={t} />}
         <div className="modal-foot"><button className="new" onClick={onClose}>{t.close}</button></div>
       </div>
@@ -242,11 +273,27 @@ export default function App() {
   const [status, setStatus] = useState('saved');
   const [query, setQuery] = useState('');
   const [showSettings, setShowSettings] = useState(false);
+  const [external, setExternal] = useState(null);
   const loaded = useRef({ path: null, body: '' });
   const pending = useRef(null);
+  // What is on disk as far as this window knows (last loaded or last saved). A different file content means
+  // the note was changed elsewhere, e.g. synced from the phone.
+  const savedBody = useRef('');
   const t = STRINGS[settings?.lang || 'en'];
   const ai = useAi(t);
   const [aiStatus, setAiStatus, reloadAiStatus] = useAiStatus();
+  const [sync, reloadSync] = useSync();
+  const liveEnabled = useRef(false);
+  liveEnabled.current = !!settings?.liveTyping;
+  const live = useLive({
+    loaded,
+    savedBody,
+    setBody,
+    setStatus,
+    // The live link broke: carry on as a normal note, saving what is in the editor.
+    onFail: () => { setStatus('saving'); clearTimeout(pending.current); pending.current = setTimeout(() => flush(), 0); },
+    onForeign: (text) => setExternal(text),
+  });
 
   const refresh = useCallback(async () => {
     const res = await window.pyramid.listNotes();
@@ -254,30 +301,110 @@ export default function App() {
   }, []);
 
   const flush = useCallback(async () => {
+    if (live.active()) {
+      await live.save();
+      setStatus('saved');
+      refresh();
+      return;
+    }
     clearTimeout(pending.current);
     const { path, body: text } = loaded.current;
     if (path == null || pending.current === null) return;
     pending.current = null;
+    savedBody.current = text; // set before the write: the file watcher fires while it is still in flight
     await window.pyramid.saveNote(path, text);
     setStatus('saved');
     refresh();
-  }, [refresh]);
+  }, [refresh, live]);
+
+  const clearSelection = useCallback(() => {
+    live.drop();
+    clearTimeout(pending.current);
+    pending.current = null;
+    loaded.current = { path: null, body: '' };
+    savedBody.current = '';
+    setSelected(null);
+    setBody('');
+    setExternal(null);
+  }, [live]);
 
   const open = useCallback(async (rel) => {
     await flush();
+    await live.stop();
     ai.clear();
     const res = await window.pyramid.readNote(rel);
     if (!res.ok) return;
-    loaded.current = { path: rel, body: res.value.body };
+    let text = res.value.body;
+    // Letter-by-letter live typing (a setting): the main process owns the text of this note from now on.
+    const id = res.value.meta?.id;
+    if (liveEnabled.current && id) {
+      const liveText = await live.open(id);
+      if (liveText != null) text = liveText;
+    }
+    loaded.current = { path: rel, body: text };
+    savedBody.current = text;
     setSelected(rel);
-    setBody(res.value.body);
+    setBody(text);
+    setExternal(null);
     setStatus('saved');
-  }, [flush]);
+  }, [flush, live]);
+
+  // The notes folder changed. If the open note differs from what we last loaded/saved it was edited elsewhere:
+  // with nothing unsaved, just show the new text; with unsaved typing, ask (never overwrite silently).
+  const checkExternal = useCallback(async () => {
+    const { path } = loaded.current;
+    if (path == null || live.active()) return; // a live note is written by the main process; its text arrives over the live link
+    const res = await window.pyramid.readNote(path);
+    if (loaded.current.path !== path) return;
+    if (!res.ok) {
+      if (pending.current === null) clearSelection();
+      return;
+    }
+    const disk = res.value.body;
+    if (disk === savedBody.current) return;
+    if (pending.current === null) {
+      loaded.current = { path, body: disk };
+      savedBody.current = disk;
+      setBody(disk);
+      setExternal(null);
+    } else {
+      setExternal(disk);
+    }
+  }, [clearSelection, live]);
+
+  const takeExternal = () => {
+    if (live.hasForeign()) {
+      live.resolveForeign(true);
+      setExternal(null);
+      setStatus('saved');
+      return;
+    }
+    clearTimeout(pending.current);
+    pending.current = null;
+    loaded.current = { path: loaded.current.path, body: external };
+    savedBody.current = external;
+    setBody(external);
+    setExternal(null);
+    setStatus('saved');
+  };
+
+  const keepMine = async () => {
+    setExternal(null);
+    if (live.hasForeign()) {
+      live.resolveForeign(false);
+      return;
+    }
+    await flush();
+  };
 
   const edit = (text) => {
     setBody(text);
     loaded.current = { path: selected, body: text };
     setStatus('saving');
+    if (live.active()) {
+      live.run();
+      return;
+    }
     clearTimeout(pending.current);
     pending.current = setTimeout(flush, SAVE_DELAY);
   };
@@ -292,13 +419,12 @@ export default function App() {
   }, [flush, refresh, open]);
 
   const remove = async () => {
+    live.drop();
     clearTimeout(pending.current);
     pending.current = null;
     const res = await window.pyramid.removeNote(selected);
     if (res.ok) {
-      loaded.current = { path: null, body: '' };
-      setSelected(null);
-      setBody('');
+      clearSelection();
       refresh();
     }
   };
@@ -320,9 +446,7 @@ ${text}`);
     if (res.ok) {
       setSettings(res.value);
       if (patch.notesDir) {
-        loaded.current = { path: null, body: '' };
-        setSelected(null);
-        setBody('');
+        clearSelection();
         refresh();
       }
     }
@@ -331,8 +455,19 @@ ${text}`);
   useEffect(() => {
     window.pyramid.getSettings().then(setSettings);
     refresh();
-    return window.pyramid.onNotesChanged(refresh);
-  }, [refresh]);
+    return window.pyramid.onNotesChanged(() => { refresh(); checkExternal(); });
+  }, [refresh, checkExternal]);
+
+  useEffect(() => window.pyramid.onLiveChanged((e) => live.onEvent(e)), [live]);
+
+  // Switching the setting while a note is open: reopen it the new way.
+  const liveWas = useRef(null);
+  useEffect(() => {
+    if (!settings) return;
+    const on = !!settings.liveTyping;
+    if (liveWas.current !== null && liveWas.current !== on && loaded.current.path) open(loaded.current.path);
+    liveWas.current = on;
+  }, [settings?.liveTyping]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (settings) document.documentElement.lang = settings.lang;
@@ -350,6 +485,38 @@ ${text}`);
 
   if (!settings) return null;
 
+  const openConflicts = sync?.conflicts || [];
+  const flagged = new Set(openConflicts.flatMap((c) => [c.noteId, c.copyId]));
+  const current = notes.find((n) => n.path === selected);
+  const conflict = current?.id ? openConflicts.find((c) => c.noteId === current.id || c.copyId === current.id) : null;
+
+  const resolved = async () => {
+    const res = await window.pyramid.listNotes();
+    if (res.ok) {
+      setNotes(res.value);
+      if (!res.value.some((n) => n.path === selected)) clearSelection();
+      else checkExternal();
+    }
+    reloadSync();
+  };
+
+  const bars = (
+    <>
+      {conflict && (
+        <ConflictBar
+          key={conflict.copyId}
+          conflict={conflict}
+          isCopy={current.id === conflict.copyId}
+          origTitle={notes.find((n) => n.id === conflict.noteId)?.title}
+          copyTitle={notes.find((n) => n.id === conflict.copyId)?.title}
+          onDone={resolved}
+          t={t}
+        />
+      )}
+      {external !== null && <ExternalBar onTake={takeExternal} onKeep={keepMine} t={t} />}
+    </>
+  );
+
   return (
     <div className="layout">
       <Sidebar
@@ -360,6 +527,9 @@ ${text}`);
         onOpen={open}
         onCreate={create}
         onSettings={() => setShowSettings(true)}
+        sync={sync}
+        flagged={flagged}
+        lang={settings.lang}
         t={t}
       />
       <main key={selected || 'home'}>
@@ -374,6 +544,7 @@ ${text}`);
               ai={ai}
               aiStatus={aiStatus}
               onAiSettings={() => setShowSettings(true)}
+              bars={bars}
               t={t}
             />
           : <Home
@@ -393,6 +564,8 @@ ${text}`);
           onChange={changeSettings}
           aiStatus={aiStatus}
           setAiStatus={setAiStatus}
+          sync={sync}
+          reloadSync={reloadSync}
           onClose={() => { setShowSettings(false); reloadAiStatus(); }}
           t={t}
         />
